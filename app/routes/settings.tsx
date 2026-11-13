@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher, useLocation } from "react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { Route } from "./+types/settings";
@@ -88,8 +88,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { name, bio } = parsed.data;
 
-  db
-    .update(users)
+  db.update(users)
     .set({ name, email: currentUser.email, bio: bio || null })
     .where(eq(users.id, currentUser.id))
     .returning()
@@ -105,12 +104,24 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
   const fetcher = useFetcher();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  // PROTOTYPE (#33): a Refund Request Notification links to
+  // /settings#refund-request-<id>. Scroll the main pane to it and highlight
+  // it; CSS :target doesn't update on client-side navigation.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    document
+      .getElementById(hash.slice(1))
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [hash]);
+
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
       toast.success("Profile updated successfully.");
     }
     if (fetcher.state === "idle" && fetcher.data?.errors) {
-      const firstError = Object.values(fetcher.data.errors)[0] as string | undefined;
+      const firstError = Object.values(fetcher.data.errors)[0] as
+        string | undefined;
       if (firstError) toast.error(firstError);
     }
   }, [fetcher.state, fetcher.data]);
@@ -178,10 +189,7 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
                 </p>
               </div>
             )}
-            <Button
-              type="submit"
-              disabled={fetcher.state !== "idle"}
-            >
+            <Button type="submit" disabled={fetcher.state !== "idle"}>
               {fetcher.state !== "idle" ? "Saving..." : "Save Changes"}
             </Button>
           </fetcher.Form>
@@ -189,7 +197,7 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
       </Card>
 
       {refundRequests.length > 0 && (
-        <Card className="mt-8 max-w-md">
+        <Card id="refund-requests" className="mt-8 max-w-md">
           <CardHeader>
             <h2 className="text-lg font-semibold">Refund Requests</h2>
             {openCount > 0 && (
@@ -202,7 +210,15 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {refundRequests.map((refundRequest) => (
-              <div key={refundRequest.id} className="rounded-md border p-3">
+              <div
+                key={refundRequest.id}
+                id={`refund-request-${refundRequest.id}`}
+                className={
+                  hash === `#refund-request-${refundRequest.id}`
+                    ? "rounded-md border p-3 ring-2 ring-primary transition-shadow"
+                    : "rounded-md border p-3"
+                }
+              >
                 <div className="flex items-start justify-between gap-3">
                   <Link
                     to={`/courses/${refundRequest.courseSlug}`}
@@ -283,12 +299,10 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
           : "Please select a user from the DevUI panel.";
     } else if (error.status === 404) {
       title = "User not found";
-      message =
-        typeof error.data === "string" ? error.data : "User not found.";
+      message = typeof error.data === "string" ? error.data : "User not found.";
     } else {
       title = `Error ${error.status}`;
-      message =
-        typeof error.data === "string" ? error.data : error.statusText;
+      message = typeof error.data === "string" ? error.data : error.statusText;
     }
   }
 

@@ -254,7 +254,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
         data: {
           courseTitle: decided.course.title,
           note: decided.refund.decisionNote,
-          url: `/courses/${decided.course.slug}`,
+          url: `/settings#refund-request-${decided.refund.id}`,
           occurredAt: decided.refund.resolvedAt,
         },
       });

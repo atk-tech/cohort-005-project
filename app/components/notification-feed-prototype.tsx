@@ -247,7 +247,7 @@ function describe(item: FeedItem): Described {
         title: <>Your Refund Request for {course} was approved</>,
         plain: `Refund Request approved: ${d.courseTitle}`,
         body: d.note,
-        cta: "View course",
+        cta: "View Refund Request",
       };
     case "refund-declined":
       return {
@@ -258,7 +258,7 @@ function describe(item: FeedItem): Described {
         body: d.note
           ? `${d.note} You can ask again from the course page.`
           : undefined,
-        cta: "View course",
+        cta: "View Refund Request",
       };
     case "refund-request-open":
       return {
