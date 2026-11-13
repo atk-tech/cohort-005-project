@@ -21,6 +21,7 @@ import {
   LessonProgressStatus,
 } from "~/db/schema";
 import { eq, and, or, sql, desc, inArray, max } from "drizzle-orm";
+import { HashTarget } from "~/components/hash-target";
 
 function getUserById(id: number) {
   return db.select().from(users).where(eq(users.id, id)).get();
@@ -436,8 +437,10 @@ export default function InstructorStudentRoster({
                     });
 
                     return (
-                      <tr
+                      <HashTarget
+                        as="tr"
                         key={student.userId}
+                        id={`student-${student.userId}`}
                         className="border-b border-border last:border-0"
                       >
                         <td className="px-4 py-3">
@@ -490,7 +493,7 @@ export default function InstructorStudentRoster({
                             </div>
                           </td>
                         )}
-                      </tr>
+                      </HashTarget>
                     );
                   })}
                 </tbody>

@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
-import { useFetcher, useLocation } from "react-router";
+import { useFetcher } from "react-router";
+import { HashTarget } from "~/components/hash-target";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { Route } from "./+types/settings";
@@ -104,17 +105,6 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
   const fetcher = useFetcher();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // PROTOTYPE (#33): a Refund Request Notification links to
-  // /settings#refund-request-<id>. Scroll the main pane to it and highlight
-  // it; CSS :target doesn't update on client-side navigation.
-  const { hash } = useLocation();
-  useEffect(() => {
-    if (!hash) return;
-    document
-      .getElementById(hash.slice(1))
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [hash]);
-
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
       toast.success("Profile updated successfully.");
@@ -210,14 +200,10 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {refundRequests.map((refundRequest) => (
-              <div
+              <HashTarget
                 key={refundRequest.id}
                 id={`refund-request-${refundRequest.id}`}
-                className={
-                  hash === `#refund-request-${refundRequest.id}`
-                    ? "rounded-md border p-3 ring-2 ring-primary transition-shadow"
-                    : "rounded-md border p-3"
-                }
+                className="rounded-md border p-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <Link
@@ -246,7 +232,7 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
                     {refundRequest.decisionNote}
                   </p>
                 )}
-              </div>
+              </HashTarget>
             ))}
           </CardContent>
         </Card>

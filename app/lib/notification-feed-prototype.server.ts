@@ -163,7 +163,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
       actor: enrollment.actor,
       data: {
         courseTitle: enrollment.course.title,
-        url: `/instructor/${enrollment.course.id}/students`,
+        url: `/instructor/${enrollment.course.id}/students#student-${enrollment.actor.id}`,
         occurredAt: enrollment.enrolledAt,
       },
     });
@@ -198,7 +198,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
       data: {
         courseTitle: seat.course.title,
         seatsLeft: left,
-        url: "/team",
+        url: `/team#seat-${seat.coupon.id}`,
         occurredAt: seat.coupon.redeemedAt,
       },
     });
@@ -228,7 +228,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
           courseTitle: open.course.title,
           amountCents: open.purchase.amountPaid,
           reason: open.refund.reason,
-          url: "/admin/refunds",
+          url: `/admin/refunds#refund-request-${open.refund.id}`,
           occurredAt: open.refund.requestedAt,
         },
       });

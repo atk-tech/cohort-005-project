@@ -25,6 +25,7 @@ import {
   type SeatAvailability,
 } from "~/lib/refunds.server";
 import { formatPrice } from "~/lib/utils";
+import { HashTarget } from "~/components/hash-target";
 
 function getTeamForAdmin(userId: number) {
   const membership = db
@@ -309,7 +310,12 @@ export default function Team({ loaderData }: Route.ComponentProps) {
               </thead>
               <tbody>
                 {filteredCoupons.map((coupon) => (
-                  <tr key={coupon.id} className="border-b last:border-0">
+                  <HashTarget
+                    as="tr"
+                    key={coupon.id}
+                    id={`seat-${coupon.id}`}
+                    className="border-b last:border-0"
+                  >
                     <td className="px-4 py-3">
                       <code className="rounded bg-muted px-2 py-0.5 text-xs">
                         {coupon.code}
@@ -340,7 +346,7 @@ export default function Team({ loaderData }: Route.ComponentProps) {
                         <CopyButton code={coupon.code} />
                       )}
                     </td>
-                  </tr>
+                  </HashTarget>
                 ))}
               </tbody>
             </table>
@@ -400,12 +406,13 @@ function TeamLicenceRow({ licence }: { licence: TeamLicence }) {
           )}
         </div>
 
-        {refundRequest?.status === RefundStatus.Declined && refundRequest.decisionNote && (
-          <p className="mt-3 rounded-md bg-muted p-2 text-sm">
-            <span className="font-medium">Refund declined: </span>
-            {refundRequest.decisionNote}
-          </p>
-        )}
+        {refundRequest?.status === RefundStatus.Declined &&
+          refundRequest.decisionNote && (
+            <p className="mt-3 rounded-md bg-muted p-2 text-sm">
+              <span className="font-medium">Refund declined: </span>
+              {refundRequest.decisionNote}
+            </p>
+          )}
 
         {licence.canRequestRefund && isFormOpen && (
           <fetcher.Form
@@ -418,7 +425,10 @@ function TeamLicenceRow({ licence }: { licence: TeamLicence }) {
               has read your note. Until then, none of this licence&apos;s seats
               can be claimed. You can ask until{" "}
               {/* A calendar day, so read it as local midnight, not UTC. */}
-              {new Date(`${licence.lastDayInWindow}T00:00`).toLocaleDateString()}.
+              {new Date(
+                `${licence.lastDayInWindow}T00:00`
+              ).toLocaleDateString()}
+              .
             </p>
             <input type="hidden" name="purchaseId" value={licence.purchaseId} />
             <Textarea

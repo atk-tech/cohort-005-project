@@ -22,10 +22,9 @@ import {
 } from "~/lib/refunds.server";
 import { RULE_BREAK_LABELS } from "~/lib/refund-rules";
 import { sendEmail } from "~/lib/mailer.server";
+import { HashTarget } from "~/components/hash-target";
 
-const refundFilterSchema = z
-  .nativeEnum(RefundStatus)
-  .catch(RefundStatus.Open);
+const refundFilterSchema = z.nativeEnum(RefundStatus).catch(RefundStatus.Open);
 
 const adminRefundActionSchema = z.discriminatedUnion("intent", [
   z.object({
@@ -211,11 +210,7 @@ function formatHours(seconds: number) {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
-function Figures({
-  refundRequest,
-}: {
-  refundRequest: RefundRequestForReview;
-}) {
+function Figures({ refundRequest }: { refundRequest: RefundRequestForReview }) {
   const { figures } = refundRequest;
 
   const items =
@@ -288,92 +283,97 @@ function RefundRequestCard({
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <Link
-              to={`/courses/${refundRequest.courseSlug}`}
-              className="font-semibold hover:underline"
-            >
-              {refundRequest.courseTitle}
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              {refundRequest.buyerName} · {refundRequest.buyerEmail} · raised{" "}
-              {new Date(refundRequest.requestedAt).toLocaleDateString()}
-            </p>
+    <HashTarget
+      id={`refund-request-${refundRequest.id}`}
+      className="rounded-xl"
+    >
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Link
+                to={`/courses/${refundRequest.courseSlug}`}
+                className="font-semibold hover:underline"
+              >
+                {refundRequest.courseTitle}
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                {refundRequest.buyerName} · {refundRequest.buyerEmail} · raised{" "}
+                {new Date(refundRequest.requestedAt).toLocaleDateString()}
+              </p>
+            </div>
+            {refundRequest.ruleBreaks.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {refundRequest.ruleBreaks.map((ruleBreak) => (
+                  <span
+                    key={ruleBreak}
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  >
+                    <AlertTriangle className="size-3" />
+                    {RULE_BREAK_LABELS[ruleBreak]}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {refundRequest.ruleBreaks.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {refundRequest.ruleBreaks.map((ruleBreak) => (
-                <span
-                  key={ruleBreak}
-                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+
+          <Figures refundRequest={refundRequest} />
+
+          <blockquote className="border-l-2 pl-3 text-sm">
+            {refundRequest.reason}
+          </blockquote>
+
+          {isOpen ? (
+            <div className="space-y-2 border-t pt-4">
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="A note to the buyer. Required to decline."
+              />
+              {!refundRequest.canApprove && (
+                <p className="text-xs text-muted-foreground">
+                  A Seat on this Team Licence has been claimed, so it can only
+                  be declined.
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => decide("approve")}
+                  disabled={isSubmitting || !refundRequest.canApprove}
                 >
-                  <AlertTriangle className="size-3" />
-                  {RULE_BREAK_LABELS[ruleBreak]}
-                </span>
-              ))}
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => decide("decline")}
+                  disabled={isSubmitting || note.trim().length === 0}
+                >
+                  Decline
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t pt-4 text-sm text-muted-foreground">
+              {refundRequest.status === RefundStatus.Approved
+                ? "Approved"
+                : "Declined"}
+              {refundRequest.decidedByName &&
+                ` by ${refundRequest.decidedByName}`}
+              {refundRequest.resolvedAt &&
+                ` on ${new Date(refundRequest.resolvedAt).toLocaleDateString()}`}
+              {refundRequest.decisionNote && (
+                <p className="mt-2 rounded-md bg-muted p-2 text-foreground">
+                  {refundRequest.decisionNote}
+                </p>
+              )}
             </div>
           )}
-        </div>
-
-        <Figures refundRequest={refundRequest} />
-
-        <blockquote className="border-l-2 pl-3 text-sm">
-          {refundRequest.reason}
-        </blockquote>
-
-        {isOpen ? (
-          <div className="space-y-2 border-t pt-4">
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="A note to the buyer. Required to decline."
-            />
-            {!refundRequest.canApprove && (
-              <p className="text-xs text-muted-foreground">
-                A Seat on this Team Licence has been claimed, so it can only be
-                declined.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => decide("approve")}
-                disabled={isSubmitting || !refundRequest.canApprove}
-              >
-                Approve
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => decide("decline")}
-                disabled={isSubmitting || note.trim().length === 0}
-              >
-                Decline
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="border-t pt-4 text-sm text-muted-foreground">
-            {refundRequest.status === RefundStatus.Approved
-              ? "Approved"
-              : "Declined"}
-            {refundRequest.decidedByName &&
-              ` by ${refundRequest.decidedByName}`}
-            {refundRequest.resolvedAt &&
-              ` on ${new Date(refundRequest.resolvedAt).toLocaleDateString()}`}
-            {refundRequest.decisionNote && (
-              <p className="mt-2 rounded-md bg-muted p-2 text-foreground">
-                {refundRequest.decisionNote}
-              </p>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </HashTarget>
   );
 }
 

@@ -8,6 +8,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { UserAvatar } from "~/components/user-avatar";
 import { cn, formatRelativeTime } from "~/lib/utils";
 import { MAX_COMMENT_LENGTH } from "~/lib/comments";
+import { HashTarget } from "~/components/hash-target";
 
 // Bodies arrive pre-rendered from the server (renderComment), because comments
 // are untrusted markdown and the sanitising renderer is server-only.
@@ -100,7 +101,11 @@ function CommentForm({
       />
 
       <div className="flex items-center gap-3">
-        <Button type="submit" size="sm" disabled={submitting || empty || tooLong}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={submitting || empty || tooLong}
+        >
           {submitting ? "Posting..." : submitLabel}
         </Button>
 
@@ -206,11 +211,12 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
 
-  const isAuthor = currentUserId !== null && comment.author.id === currentUserId;
+  const isAuthor =
+    currentUserId !== null && comment.author.id === currentUserId;
 
   if (comment.deleted) {
     return (
-      <div className="py-3">
+      <HashTarget id={`comment-${comment.id}`} className="py-3">
         <p className="text-sm italic text-muted-foreground">
           This comment was deleted.
         </p>
@@ -220,12 +226,15 @@ function CommentItem({
           canModerate={canModerate}
           canPost={canPost}
         />
-      </div>
+      </HashTarget>
     );
   }
 
   return (
-    <div className={cn("py-3", isReply && "border-l pl-4")}>
+    <HashTarget
+      id={`comment-${comment.id}`}
+      className={cn("py-3", isReply && "border-l pl-4")}
+    >
       <div className="flex items-start gap-3">
         <UserAvatar
           name={comment.author.name}
@@ -305,7 +314,7 @@ function CommentItem({
         canModerate={canModerate}
         canPost={canPost}
       />
-    </div>
+    </HashTarget>
   );
 }
 
