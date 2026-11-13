@@ -109,6 +109,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
         lessonTitle: reply.lesson.title,
         snippet: reply.reply.body.slice(0, 160),
         url: lessonUrl(reply.course.slug, reply.lesson.id, reply.reply.id),
+        occurredAt: reply.reply.createdAt,
       },
     });
 
@@ -139,12 +140,17 @@ export async function seedSampleNotifications(cadenceUserId: number) {
         lessonTitle: question.lesson.title,
         snippet: question.q.body.slice(0, 160),
         url: lessonUrl(question.course.slug, question.lesson.id, question.q.id),
+        occurredAt: question.q.createdAt,
       },
     });
 
   // 5. New Enrollment → Instructor (off by default; seeded so it can be judged).
   const enrollment = db
-    .select({ course: courses, actor: users })
+    .select({
+      course: courses,
+      actor: users,
+      enrolledAt: enrollments.enrolledAt,
+    })
     .from(enrollments)
     .innerJoin(courses, eq(courses.id, enrollments.courseId))
     .innerJoin(users, eq(users.id, enrollments.userId))
@@ -158,6 +164,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
       data: {
         courseTitle: enrollment.course.title,
         url: `/instructor/${enrollment.course.id}/students`,
+        occurredAt: enrollment.enrolledAt,
       },
     });
 
@@ -188,7 +195,12 @@ export async function seedSampleNotifications(cadenceUserId: number) {
     samples.push({
       kind: "seat-claimed",
       actor: seat.actor,
-      data: { courseTitle: seat.course.title, seatsLeft: left, url: "/team" },
+      data: {
+        courseTitle: seat.course.title,
+        seatsLeft: left,
+        url: "/team",
+        occurredAt: seat.coupon.redeemedAt,
+      },
     });
   }
 
@@ -217,6 +229,7 @@ export async function seedSampleNotifications(cadenceUserId: number) {
           amountCents: open.purchase.amountPaid,
           reason: open.refund.reason,
           url: "/admin/refunds",
+          occurredAt: open.refund.requestedAt,
         },
       });
   }
@@ -242,10 +255,13 @@ export async function seedSampleNotifications(cadenceUserId: number) {
           courseTitle: decided.course.title,
           note: decided.refund.decisionNote,
           url: `/courses/${decided.course.slug}`,
+          occurredAt: decided.refund.resolvedAt,
         },
       });
   }
 
+  // Each sample carries `occurredAt`, the real event time, because the seed
+  // replays past events; in production the Notification is created at that time.
   // Oldest first, so the feed's newest-first order matches the list above.
   for (const s of samples.reverse()) {
     await knock.workflows.trigger("discussion-reply", {

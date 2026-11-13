@@ -74,8 +74,13 @@ export type FeedItem = {
     amountCents?: number;
     seatsLeft?: number;
     url: string;
+    // PROTOTYPE: the seed replays past events, so it passes the real event
+    // time. In production the Notification is created when the event happens.
+    occurredAt?: string | null;
   };
 };
+
+const at = (item: FeedItem) => item.data.occurredAt ?? item.inserted_at;
 
 type FeedMeta = {
   unread_count: number;
@@ -139,7 +144,11 @@ export function NotificationFeedProvider({
     );
     if (!res.ok) return;
     const body = await res.json();
-    setItems(body.entries);
+    setItems(
+      [...body.entries].sort((x: FeedItem, y: FeedItem) =>
+        at(y).localeCompare(at(x))
+      )
+    );
     setMeta(body.meta);
     setLoaded(true);
   }, [config?.knockUserId, headers]);
@@ -503,7 +512,7 @@ export function VariantABell() {
                       {describe(item).title}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {ago(item.inserted_at)}
+                      {ago(at(item))}
                     </p>
                   </div>
                   <UnreadDot item={item} />
@@ -537,7 +546,7 @@ export function VariantBDrawerNavItem() {
   const [open, setOpen] = useState(false);
 
   const groups = feed.items.reduce<Record<string, FeedItem[]>>((acc, i) => {
-    (acc[dayGroup(i.inserted_at)] ??= []).push(i);
+    (acc[dayGroup(at(i))] ??= []).push(i);
     return acc;
   }, {});
 
@@ -616,8 +625,7 @@ export function VariantBDrawerNavItem() {
                                   </p>
                                 )}
                                 <p className="mt-1.5 text-xs text-muted-foreground">
-                                  {item.data.courseTitle} ·{" "}
-                                  {ago(item.inserted_at)}
+                                  {item.data.courseTitle} · {ago(at(item))}
                                 </p>
                               </div>
                             </button>
@@ -788,7 +796,7 @@ export function VariantCInboxPage() {
                         {desc.plain}
                       </p>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {ago(item.inserted_at)}
+                        {ago(at(item))}
                       </span>
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
@@ -809,7 +817,7 @@ export function VariantCInboxPage() {
                   <div className="flex items-center gap-3">
                     <Leading item={selected} size="lg" />
                     <div className="text-sm text-muted-foreground">
-                      {new Date(selected.inserted_at).toLocaleString()}
+                      {new Date(at(selected)).toLocaleString()}
                     </div>
                   </div>
                   <h2 className="text-xl leading-snug">{desc.title}</h2>
