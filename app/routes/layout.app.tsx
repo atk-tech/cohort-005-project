@@ -1,4 +1,13 @@
-import { Outlet } from "react-router";
+import { Outlet, useSearchParams } from "react-router";
+// PROTOTYPE (#33): Notification Feed variants
+import { getFeedConfig } from "~/lib/notification-feed-prototype.server";
+import {
+  NotificationFeedProvider,
+  NotificationFeedPrototypeBar,
+  VariantABell,
+  VariantBDrawerNavItem,
+  VariantCNavItem,
+} from "~/components/notification-feed-prototype";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
 import { DevUI } from "~/components/dev-ui";
@@ -185,7 +194,11 @@ export async function loader({ request }: Route.LoaderArgs) {
           course.courseId
         );
         const totalLessons = getTotalLessonCount(course.courseId);
-        const progress = calculateProgress(currentUserId, course.courseId, false);
+        const progress = calculateProgress(
+          currentUserId,
+          course.courseId,
+          false
+        );
         return {
           courseId: course.courseId,
           title: course.courseTitle,
@@ -213,6 +226,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     countryTierInfo,
     countries: COUNTRIES,
     isTeamAdmin: currentUserId ? isTeamAdmin(currentUserId) : false,
+    feedConfig: currentUserId ? await getFeedConfig(currentUserId) : null,
   };
 }
 
@@ -226,25 +240,38 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     countries,
     isTeamAdmin: userIsTeamAdmin,
   } = loaderData;
+  const [searchParams] = useSearchParams();
+  const variant = searchParams.get("variant") ?? "A";
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        currentUser={currentUser}
-        recentCourses={recentCourses}
-        isTeamAdmin={userIsTeamAdmin}
-      />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
-      <DevUI
-        users={users}
-        currentUser={currentUser}
-        devCountry={devCountry}
-        countryTierInfo={countryTierInfo}
-        countries={countries}
-      />
-      <Toaster position="bottom-right" richColors closeButton />
-    </div>
+    <NotificationFeedProvider config={loaderData.feedConfig}>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar
+          currentUser={currentUser}
+          recentCourses={recentCourses}
+          isTeamAdmin={userIsTeamAdmin}
+          headerSlot={currentUser && variant === "A" ? <VariantABell /> : null}
+          navSlot={
+            !currentUser ? null : variant === "B" ? (
+              <VariantBDrawerNavItem />
+            ) : variant === "C" ? (
+              <VariantCNavItem />
+            ) : null
+          }
+        />
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+        <DevUI
+          users={users}
+          currentUser={currentUser}
+          devCountry={devCountry}
+          countryTierInfo={countryTierInfo}
+          countries={countries}
+        />
+        <Toaster position="bottom-right" richColors closeButton />
+        {currentUser && <NotificationFeedPrototypeBar />}
+      </div>
+    </NotificationFeedProvider>
   );
 }
