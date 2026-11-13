@@ -6,5 +6,5 @@ import { seedSampleNotifications } from "~/lib/notification-feed-prototype.serve
 
 export async function action({ request }: Route.ActionArgs) {
   const userId = await requireUserId(request);
-  return { seeded: await seedSampleNotifications(userId) };
+  return seedSampleNotifications(userId);
 }

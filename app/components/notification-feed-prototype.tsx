@@ -38,6 +38,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { UserAvatar } from "~/components/user-avatar";
 import { PrototypeSwitcher } from "~/components/prototype-switcher";
@@ -88,7 +89,10 @@ type FeedState = {
   items: FeedItem[];
   meta: FeedMeta;
   loaded: boolean;
-  mark: (status: "read" | "unread" | "seen", ids: string[]) => Promise<void>;
+  mark: (
+    status: "read" | "unread" | "seen" | "archived",
+    ids: string[]
+  ) => Promise<void>;
   markAllRead: () => Promise<void>;
   markAllSeen: () => Promise<void>;
   refresh: () => void;
@@ -150,12 +154,15 @@ export function NotificationFeedProvider({
   }, [refresh]);
 
   const mark = useCallback(
-    async (status: "read" | "unread" | "seen", ids: string[]) => {
+    async (status: "read" | "unread" | "seen" | "archived", ids: string[]) => {
       if (!headers || ids.length === 0) return; // empty batch → 422
       // Optimistic, so the UI reacts before the next poll.
       const now = new Date().toISOString();
       setItems((prev) =>
-        prev.map((i) =>
+        (status === "archived"
+          ? prev.filter((i) => !ids.includes(i.id))
+          : prev
+        ).map((i) =>
           !ids.includes(i.id)
             ? i
             : status === "read"
@@ -853,9 +860,16 @@ export function VariantCInboxPage() {
 
 export function NotificationFeedPrototypeBar() {
   const feed = useFeed();
-  const seed = useFetcher<{ seeded: number }>();
+  const seed = useFetcher<{ seeded: string[] }>();
   useEffect(() => {
-    if (seed.data) setTimeout(feed.refresh, 2500);
+    if (!seed.data) return;
+    const kinds = seed.data.seeded;
+    if (kinds.length === 0)
+      toast.info(
+        "Nothing to seed: this user would receive no Notifications from the data in data.db."
+      );
+    else toast.success(`Seeded ${kinds.length}: ${kinds.join(", ")}`);
+    setTimeout(feed.refresh, 2500);
   }, [seed.data]);
 
   return (
@@ -873,9 +887,22 @@ export function NotificationFeedPrototypeBar() {
               disabled={seed.state !== "idle"}
               className="rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-zinc-900 hover:bg-amber-300 disabled:opacity-50"
             >
-              {seed.state !== "idle" ? "Seeding…" : "Seed 7 to me"}
+              {seed.state !== "idle" ? "Seeding…" : "Seed my Notifications"}
             </button>
           </seed.Form>
+          <button
+            onClick={() =>
+              feed.mark(
+                "archived",
+                feed.items.map((i) => i.id)
+              )
+            }
+            disabled={feed.items.length === 0}
+            className="rounded-full px-3 py-1 text-xs text-white/80 hover:bg-white/15 disabled:opacity-40"
+            title="Archive every Notification in my feed"
+          >
+            Clear
+          </button>
         </>
       }
     />

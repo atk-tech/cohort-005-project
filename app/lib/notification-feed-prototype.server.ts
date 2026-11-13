@@ -1,9 +1,22 @@
 // PROTOTYPE, throwaway. "What does the Notification Feed look like in Cadence?"
 // (atk-tech/cohort-005-project#33). Lives on prototype/notification-feed only.
 import Knock, { signUserToken } from "@knocklabs/node";
-import { and, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "~/db";
-import { comments, courses, lessons, users } from "~/db/schema";
+import {
+  comments,
+  coupons,
+  courses,
+  enrollments,
+  lessons,
+  modules,
+  purchases,
+  refunds,
+  RefundStatus,
+  UserRole,
+  users,
+} from "~/db/schema";
 
 if (!process.env.KNOCK_SECRET_API_KEY) {
   // Vite doesn't put non-VITE_ vars on process.env, so load .env ourselves.
@@ -40,102 +53,201 @@ export type FeedKind =
   | "discussion-question"
   | "discussion-reply";
 
-// Seeds one of each catalogue Notification into the current user's feed,
-// regardless of their role, so every row type can be judged side by side.
+type Sample = {
+  kind: FeedKind;
+  actor: { id: number; name: string; email: string } | null;
+  data: Record<string, unknown>;
+};
+
+const lessonUrl = (slug: string, lessonId: number, commentId: number) =>
+  `/courses/${slug}/lessons/${lessonId}#comment-${commentId}`;
+
+// Seeds the current user's feed with the catalogue Notifications (#29) they
+// would really receive, built from real rows in data.db: only Notifications
+// whose facts exist (a real Discussion Reply to their own question, a real
+// decided Refund Request on their own Purchase, ...). Kinds with no matching
+// row are skipped and reported back.
 // Shortcut: only `discussion-reply` and `new-enrollment` workflows exist in
 // Knock Development, so every kind goes through `discussion-reply` with a
 // `kind` in its data. The feed is headless, so the template doesn't matter.
 export async function seedSampleNotifications(cadenceUserId: number) {
   const me = db.select().from(users).where(eq(users.id, cadenceUserId)).get()!;
-  const others = db
-    .select()
-    .from(users)
-    .where(ne(users.id, cadenceUserId))
-    .limit(4)
-    .all();
-  const course = db.select().from(courses).limit(1).get()!;
-  const comment = db
+  const samples: Sample[] = [];
+  const parent = alias(comments, "parent");
+  const asker = alias(users, "asker");
+
+  // 7. Discussion Reply → question author: a reply by someone else to my question.
+  const reply = db
     .select({
-      id: comments.id,
-      body: comments.body,
-      lessonId: lessons.id,
-      lessonTitle: lessons.title,
+      reply: comments,
+      parent,
+      lesson: lessons,
+      course: courses,
+      actor: users,
     })
     .from(comments)
+    .innerJoin(parent, eq(parent.id, comments.parentId))
+    .innerJoin(users, eq(users.id, comments.userId))
     .innerJoin(lessons, eq(lessons.id, comments.lessonId))
-    .where(and(isNull(comments.parentId), isNull(comments.deletedAt)))
+    .innerJoin(modules, eq(modules.id, lessons.moduleId))
+    .innerJoin(courses, eq(courses.id, modules.courseId))
+    .where(
+      and(
+        eq(parent.userId, me.id),
+        ne(comments.userId, me.id),
+        isNull(comments.deletedAt)
+      )
+    )
     .orderBy(desc(comments.createdAt))
     .get();
-
-  const lessonTitle = comment?.lessonTitle ?? "Introduction";
-  const lessonUrl = comment
-    ? `/courses/${course.slug}/lessons/${comment.lessonId}#comment-${comment.id}`
-    : `/courses/${course.slug}`;
-  const snippet = (
-    comment?.body ?? "How does this work with nested routes?"
-  ).slice(0, 120);
-  const who = (i: number) => others[i % others.length];
-
-  const samples: {
-    kind: FeedKind;
-    actor: (typeof others)[number] | null;
-    data: Record<string, unknown>;
-  }[] = [
-    {
-      kind: "refund-declined",
-      actor: null,
-      data: {
-        courseTitle: course.title,
-        note: "You've completed most of the course, so this falls outside the refund window.",
-        url: `/courses/${course.slug}`,
-      },
-    },
-    {
-      kind: "enrollment",
-      actor: who(3),
-      data: {
-        courseTitle: course.title,
-        url: `/instructor/${course.id}/students`,
-      },
-    },
-    {
-      kind: "seat-claimed",
-      actor: who(2),
-      data: { courseTitle: course.title, seatsLeft: 3, url: "/team" },
-    },
-    {
-      kind: "refund-request-open",
-      actor: who(1),
-      data: {
-        courseTitle: course.title,
-        amountCents: 4900,
-        reason: "The course wasn't what I expected from the description.",
-        url: "/admin/refunds",
-      },
-    },
-    {
-      kind: "discussion-question",
-      actor: who(0),
-      data: { courseTitle: course.title, lessonTitle, snippet, url: lessonUrl },
-    },
-    {
-      kind: "refund-approved",
-      actor: null,
-      data: {
-        courseTitle: course.title,
-        note: "Sorry it wasn't a fit!",
-        url: `/courses/${course.slug}`,
-      },
-    },
-    {
+  if (reply)
+    samples.push({
       kind: "discussion-reply",
-      actor: who(1),
-      data: { courseTitle: course.title, lessonTitle, snippet, url: lessonUrl },
-    },
-  ];
+      actor: reply.actor,
+      data: {
+        courseTitle: reply.course.title,
+        lessonTitle: reply.lesson.title,
+        snippet: reply.reply.body.slice(0, 160),
+        url: lessonUrl(reply.course.slug, reply.lesson.id, reply.reply.id),
+      },
+    });
 
-  // Sequential so inserted_at orders them; the last one is the newest.
-  for (const s of samples) {
+  // 6. Discussion Question → Instructor: a question on my course, not by me.
+  const question = db
+    .select({ q: comments, lesson: lessons, course: courses, actor: asker })
+    .from(comments)
+    .innerJoin(asker, eq(asker.id, comments.userId))
+    .innerJoin(lessons, eq(lessons.id, comments.lessonId))
+    .innerJoin(modules, eq(modules.id, lessons.moduleId))
+    .innerJoin(courses, eq(courses.id, modules.courseId))
+    .where(
+      and(
+        eq(courses.instructorId, me.id),
+        isNull(comments.parentId),
+        isNull(comments.deletedAt),
+        ne(comments.userId, me.id)
+      )
+    )
+    .orderBy(desc(comments.createdAt))
+    .get();
+  if (question)
+    samples.push({
+      kind: "discussion-question",
+      actor: question.actor,
+      data: {
+        courseTitle: question.course.title,
+        lessonTitle: question.lesson.title,
+        snippet: question.q.body.slice(0, 160),
+        url: lessonUrl(question.course.slug, question.lesson.id, question.q.id),
+      },
+    });
+
+  // 5. New Enrollment → Instructor (off by default; seeded so it can be judged).
+  const enrollment = db
+    .select({ course: courses, actor: users })
+    .from(enrollments)
+    .innerJoin(courses, eq(courses.id, enrollments.courseId))
+    .innerJoin(users, eq(users.id, enrollments.userId))
+    .where(eq(courses.instructorId, me.id))
+    .orderBy(desc(enrollments.enrolledAt))
+    .get();
+  if (enrollment)
+    samples.push({
+      kind: "enrollment",
+      actor: enrollment.actor,
+      data: {
+        courseTitle: enrollment.course.title,
+        url: `/instructor/${enrollment.course.id}/students`,
+      },
+    });
+
+  // 4. Seat claimed → the Team Admin who owns the Team Licence.
+  const seat = db
+    .select({ coupon: coupons, course: courses, actor: users })
+    .from(coupons)
+    .innerJoin(purchases, eq(purchases.id, coupons.purchaseId))
+    .innerJoin(courses, eq(courses.id, coupons.courseId))
+    .innerJoin(users, eq(users.id, coupons.redeemedByUserId))
+    .where(
+      and(eq(purchases.userId, me.id), ne(coupons.redeemedByUserId, me.id))
+    )
+    .orderBy(desc(coupons.redeemedAt))
+    .get();
+  if (seat) {
+    const left = db
+      .select({ n: sql<number>`count(*)` })
+      .from(coupons)
+      .where(
+        and(
+          eq(coupons.purchaseId, seat.coupon.purchaseId),
+          isNull(coupons.redeemedByUserId),
+          isNull(coupons.refundedAt)
+        )
+      )
+      .get()!.n;
+    samples.push({
+      kind: "seat-claimed",
+      actor: seat.actor,
+      data: { courseTitle: seat.course.title, seatsLeft: left, url: "/team" },
+    });
+  }
+
+  // 3. New Open Refund Request → every Platform Admin.
+  if (me.role === UserRole.Admin) {
+    const open = db
+      .select({
+        refund: refunds,
+        purchase: purchases,
+        course: courses,
+        actor: users,
+      })
+      .from(refunds)
+      .innerJoin(purchases, eq(purchases.id, refunds.purchaseId))
+      .innerJoin(courses, eq(courses.id, purchases.courseId))
+      .innerJoin(users, eq(users.id, purchases.userId))
+      .where(eq(refunds.status, RefundStatus.Open))
+      .orderBy(desc(refunds.requestedAt))
+      .get();
+    if (open)
+      samples.push({
+        kind: "refund-request-open",
+        actor: open.actor,
+        data: {
+          courseTitle: open.course.title,
+          amountCents: open.purchase.amountPaid,
+          reason: open.refund.reason,
+          url: "/admin/refunds",
+        },
+      });
+  }
+
+  // 1 + 2. Refund Request approved / declined → the buyer. System-caused.
+  for (const status of [RefundStatus.Approved, RefundStatus.Declined]) {
+    const decided = db
+      .select({ refund: refunds, course: courses })
+      .from(refunds)
+      .innerJoin(purchases, eq(purchases.id, refunds.purchaseId))
+      .innerJoin(courses, eq(courses.id, purchases.courseId))
+      .where(and(eq(purchases.userId, me.id), eq(refunds.status, status)))
+      .orderBy(desc(refunds.resolvedAt))
+      .get();
+    if (decided)
+      samples.push({
+        kind:
+          status === RefundStatus.Approved
+            ? "refund-approved"
+            : "refund-declined",
+        actor: null,
+        data: {
+          courseTitle: decided.course.title,
+          note: decided.refund.decisionNote,
+          url: `/courses/${decided.course.slug}`,
+        },
+      });
+  }
+
+  // Oldest first, so the feed's newest-first order matches the list above.
+  for (const s of samples.reverse()) {
     await knock.workflows.trigger("discussion-reply", {
       recipients: [{ id: String(me.id), name: me.name, email: me.email }],
       actor: s.actor
@@ -144,5 +256,5 @@ export async function seedSampleNotifications(cadenceUserId: number) {
       data: { kind: s.kind, actorName: s.actor?.name ?? null, ...s.data },
     });
   }
-  return samples.length;
+  return { seeded: samples.map((s) => s.kind) };
 }
