@@ -1,6 +1,12 @@
-// PROTOTYPE, throwaway (#33). The page behind Variant C ("Inbox page").
-import { VariantCInboxPage } from "~/components/notification-feed-prototype";
+// PROTOTYPE, throwaway (#33). The page behind Variant C ("Inbox page") and
+// Variant D ("Bell + overview page").
+import {
+  useFeed,
+  VariantCInboxPage,
+  VariantDOverviewPage,
+} from "~/components/notification-feed-prototype";
 
 export default function NotificationsPrototype() {
-  return <VariantCInboxPage />;
+  const { variant } = useFeed();
+  return variant === "D" ? <VariantDOverviewPage /> : <VariantCInboxPage />;
 }

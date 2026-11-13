@@ -227,6 +227,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     countries: COUNTRIES,
     isTeamAdmin: currentUserId ? isTeamAdmin(currentUserId) : false,
     feedConfig: currentUserId ? await getFeedConfig(currentUserId) : null,
+    // PROTOTYPE (#33): the variant survives navigations that drop ?variant=.
+    feedVariant:
+      /(?:^|;\s*)prototype-feed-variant=([A-Z])/.exec(
+        request.headers.get("Cookie") ?? ""
+      )?.[1] ?? "A",
   };
 }
 
@@ -241,16 +246,20 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
   } = loaderData;
   const [searchParams] = useSearchParams();
-  const variant = searchParams.get("variant") ?? "A";
+  const variant = searchParams.get("variant") ?? loaderData.feedVariant;
 
   return (
-    <NotificationFeedProvider config={loaderData.feedConfig}>
+    <NotificationFeedProvider config={loaderData.feedConfig} variant={variant}>
       <div className="flex h-screen overflow-hidden">
         <Sidebar
           currentUser={currentUser}
           recentCourses={recentCourses}
           isTeamAdmin={userIsTeamAdmin}
-          headerSlot={currentUser && variant === "A" ? <VariantABell /> : null}
+          headerSlot={
+            currentUser && (variant === "A" || variant === "D") ? (
+              <VariantABell viewAll={variant === "D"} />
+            ) : null
+          }
           navSlot={
             !currentUser ? null : variant === "B" ? (
               <VariantBDrawerNavItem />

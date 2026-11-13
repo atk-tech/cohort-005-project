@@ -8,6 +8,9 @@
 //      grouped by day with the full note/snippet inline.
 //   C  Inbox page: "Notifications" nav item → /notifications, a two-pane list
 //      + detail with an explicit call to action. Badge = a dot while unseen.
+//   D  Bell + overview page: A's bell and popover for a quick look, plus a
+//      "View all" link to /notifications, a plain list (no detail pane) with
+//      filters and day groups; every row goes straight to its target.
 //
 // The feed is read straight from Knock's headless API in the browser with the
 // public key + a server-signed user token (same as the Knock spike, #35).
@@ -49,6 +52,7 @@ export const FEED_VARIANTS = [
   { key: "A", name: "Bell popover" },
   { key: "B", name: "Slide-over drawer" },
   { key: "C", name: "Inbox page" },
+  { key: "D", name: "Bell + overview page" },
 ];
 
 export type FeedConfig = {
@@ -91,6 +95,7 @@ type FeedMeta = {
 // ---------------------------------------------------------------- feed state
 
 type FeedState = {
+  variant: string;
   items: FeedItem[];
   meta: FeedMeta;
   loaded: boolean;
@@ -113,9 +118,11 @@ export function useFeed() {
 
 export function NotificationFeedProvider({
   config,
+  variant,
   children,
 }: {
   config: FeedConfig | null;
+  variant: string;
   children: ReactNode;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -193,6 +200,7 @@ export function NotificationFeedProvider({
   );
 
   const value: FeedState = {
+    variant,
     items,
     // Derive counts from items so optimistic updates show immediately.
     meta: loaded
@@ -428,7 +436,7 @@ function EmptyState({ unreadOnly }: { unreadOnly?: boolean }) {
 
 // ------------------------------------------------------ Variant A: popover
 
-export function VariantABell() {
+export function VariantABell({ viewAll = false }: { viewAll?: boolean }) {
   const feed = useFeed();
   const openItem = useOpenItem();
   const [open, setOpen] = useState(false);
@@ -520,8 +528,17 @@ export function VariantABell() {
               </li>
             ))}
           </ul>
-          <div className="border-t px-4 py-2">
+          <div className="flex items-center justify-between border-t px-4 py-2">
             <SettingsLink onClick={() => setOpen(false)} />
+            {viewAll && (
+              <Link
+                to="/notifications"
+                onClick={() => setOpen(false)}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                View all →
+              </Link>
+            )}
           </div>
         </Popover.Content>
       </Popover.Portal>
@@ -665,7 +682,7 @@ export function VariantCNavItem() {
   const feed = useFeed();
   return (
     <NavLink
-      to="/notifications?variant=C"
+      to="/notifications"
       className={({ isActive }) =>
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -864,6 +881,121 @@ export function VariantCInboxPage() {
   );
 }
 
+// ------------------------------------------- Variant D: bell + overview page
+
+export function VariantDOverviewPage() {
+  const feed = useFeed();
+  const openItem = useOpenItem();
+  const [filter, setFilter] = useState("all");
+
+  // Visiting the page counts as seeing everything, like opening the popover.
+  useEffect(() => {
+    if (feed.meta.unseen_count > 0) feed.markAllSeen();
+  }, [feed.meta.unseen_count]);
+
+  const f = C_FILTERS.find((x) => x.key === filter)!;
+  const shown = feed.items.filter((i) =>
+    filter === "unread"
+      ? !i.read_at
+      : f.kinds
+        ? f.kinds.includes(i.data.kind)
+        : true
+  );
+  const groups = shown.reduce<Record<string, FeedItem[]>>((acc, i) => {
+    (acc[dayGroup(at(i))] ??= []).push(i);
+    return acc;
+  }, {});
+
+  return (
+    <div className="mx-auto max-w-3xl p-6 lg:p-8">
+      <header className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Notifications</h1>
+          <p className="mt-1 text-muted-foreground">
+            {feed.meta.unread_count} unread
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <SettingsLink />
+          <button
+            onClick={feed.markAllRead}
+            disabled={feed.meta.unread_count === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-40"
+          >
+            <CheckCheck className="size-4" /> Mark all as read
+          </button>
+        </div>
+      </header>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {C_FILTERS.map((x) => (
+          <button
+            key={x.key}
+            onClick={() => setFilter(x.key)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-sm",
+              filter === x.key
+                ? "border-primary bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+            )}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 && <EmptyState unreadOnly={filter === "unread"} />}
+      {["Today", "Yesterday", "Earlier"].map(
+        (g) =>
+          groups[g] && (
+            <section key={g} className="mb-6">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {g}
+              </h2>
+              <ul className="divide-y rounded-lg border">
+                {groups[g].map((item) => {
+                  const desc = describe(item);
+                  return (
+                    <li key={item.id} className="group relative">
+                      <button
+                        onClick={() => openItem(item)}
+                        className={cn(
+                          "flex w-full items-start gap-3 p-4 text-left text-sm transition-colors hover:bg-accent",
+                          !item.read_at && "bg-blue-50/60 dark:bg-blue-950/30"
+                        )}
+                      >
+                        <Leading item={item} />
+                        <div className="min-w-0 flex-1 pr-8">
+                          <p className="leading-snug">{desc.title}</p>
+                          {desc.body && (
+                            <p className="mt-1.5 line-clamp-2 border-l-2 pl-2 text-muted-foreground">
+                              {desc.body}
+                            </p>
+                          )}
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            {item.data.courseTitle} · {ago(at(item))}
+                          </p>
+                        </div>
+                        <UnreadDot item={item} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          feed.mark(item.read_at ? "unread" : "read", [item.id])
+                        }
+                        title={item.read_at ? "Mark as unread" : "Mark as read"}
+                        className="absolute top-4 right-10 hidden rounded-md border bg-background p-1 text-muted-foreground shadow-sm group-hover:block hover:text-foreground"
+                      >
+                        <Check className="size-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )
+      )}
+    </div>
+  );
+}
+
 // ------------------------------------------------- switcher + state readout
 
 export function NotificationFeedPrototypeBar() {
@@ -883,6 +1015,8 @@ export function NotificationFeedPrototypeBar() {
   return (
     <PrototypeSwitcher
       variants={FEED_VARIANTS}
+      current={feed.variant}
+      cookieName="prototype-feed-variant"
       extra={
         <>
           <span className="border-l border-white/20 pl-2 font-mono text-xs text-white/70">

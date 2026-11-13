@@ -5,13 +5,19 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export function PrototypeSwitcher({
   variants,
+  current: currentProp,
+  cookieName,
   extra,
 }: {
   variants: { key: string; name: string }[];
+  // The variant in use when the URL has none (e.g. remembered in a cookie).
+  current?: string;
+  // Remember the choice across navigations that drop ?variant=.
+  cookieName?: string;
   extra?: ReactNode;
 }) {
   const [params, setParams] = useSearchParams();
-  const current = params.get("variant") ?? variants[0].key;
+  const current = params.get("variant") ?? currentProp ?? variants[0].key;
   const index = Math.max(
     0,
     variants.findIndex((v) => v.key === current)
@@ -19,6 +25,8 @@ export function PrototypeSwitcher({
 
   function go(delta: number) {
     const next = variants[(index + delta + variants.length) % variants.length];
+    if (cookieName)
+      document.cookie = `${cookieName}=${next.key}; path=/; SameSite=Lax`;
     setParams(
       (p) => {
         p.set("variant", next.key);
