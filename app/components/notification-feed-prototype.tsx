@@ -34,6 +34,8 @@ import {
   CircleX,
   GraduationCap,
   Inbox,
+  Mail,
+  MailOpen,
   MessageCircleQuestion,
   MessageSquareReply,
   Receipt,
@@ -953,7 +955,7 @@ export function VariantDOverviewPage() {
                 {groups[g].map((item) => {
                   const desc = describe(item);
                   return (
-                    <li key={item.id}>
+                    <li key={item.id} className="group relative">
                       <button
                         onClick={() => openItem(item)}
                         className={cn(
@@ -962,7 +964,7 @@ export function VariantDOverviewPage() {
                         )}
                       >
                         <Leading item={item} />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 pr-32">
                           <p className="leading-snug">{desc.title}</p>
                           {desc.body && (
                             <p className="mt-1.5 line-clamp-2 border-l-2 pl-2 text-muted-foreground">
@@ -973,6 +975,24 @@ export function VariantDOverviewPage() {
                             {item.data.courseTitle} · {ago(at(item))}
                           </p>
                         </div>
+                      </button>
+                      {/* A labelled action, not an icon: an unlabelled check
+                          read as a decoration or a selection checkbox. */}
+                      <button
+                        onClick={() =>
+                          feed.mark(item.read_at ? "unread" : "read", [item.id])
+                        }
+                        className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium text-muted-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+                      >
+                        {item.read_at ? (
+                          <>
+                            <Mail className="size-3.5" /> Mark as unread
+                          </>
+                        ) : (
+                          <>
+                            <MailOpen className="size-3.5" /> Mark as read
+                          </>
+                        )}
                       </button>
                     </li>
                   );
