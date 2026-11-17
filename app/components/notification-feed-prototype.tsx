@@ -523,7 +523,6 @@ export function VariantABell({ viewAll = false }: { viewAll?: boolean }) {
                       {ago(at(item))}
                     </p>
                   </div>
-                  <UnreadDot item={item} />
                 </button>
               </li>
             ))}
@@ -954,7 +953,7 @@ export function VariantDOverviewPage() {
                 {groups[g].map((item) => {
                   const desc = describe(item);
                   return (
-                    <li key={item.id} className="group relative">
+                    <li key={item.id}>
                       <button
                         onClick={() => openItem(item)}
                         className={cn(
@@ -963,7 +962,7 @@ export function VariantDOverviewPage() {
                         )}
                       >
                         <Leading item={item} />
-                        <div className="min-w-0 flex-1 pr-8">
+                        <div className="min-w-0 flex-1">
                           <p className="leading-snug">{desc.title}</p>
                           {desc.body && (
                             <p className="mt-1.5 line-clamp-2 border-l-2 pl-2 text-muted-foreground">
@@ -974,16 +973,6 @@ export function VariantDOverviewPage() {
                             {item.data.courseTitle} · {ago(at(item))}
                           </p>
                         </div>
-                        <UnreadDot item={item} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          feed.mark(item.read_at ? "unread" : "read", [item.id])
-                        }
-                        title={item.read_at ? "Mark as unread" : "Mark as read"}
-                        className="absolute top-4 right-10 hidden rounded-md border bg-background p-1 text-muted-foreground shadow-sm group-hover:block hover:text-foreground"
-                      >
-                        <Check className="size-3.5" />
                       </button>
                     </li>
                   );
