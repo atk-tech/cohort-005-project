@@ -887,21 +887,27 @@ export function VariantCInboxPage() {
 export function VariantDOverviewPage() {
   const feed = useFeed();
   const openItem = useOpenItem();
-  const [filter, setFilter] = useState("all");
+  // Two independent dimensions: read state, and the kind of Notification.
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [type, setType] = useState("all");
 
   // Visiting the page counts as seeing everything, like opening the popover.
   useEffect(() => {
     if (feed.meta.unseen_count > 0) feed.markAllSeen();
   }, [feed.meta.unseen_count]);
 
-  const f = C_FILTERS.find((x) => x.key === filter)!;
-  const shown = feed.items.filter((i) =>
-    filter === "unread"
-      ? !i.read_at
-      : f.kinds
-        ? f.kinds.includes(i.data.kind)
-        : true
+  // Only offer the types this person actually has in their feed.
+  const types = C_FILTERS.filter(
+    (x) => x.kinds && feed.items.some((i) => x.kinds!.includes(i.data.kind))
   );
+  const kinds = C_FILTERS.find((x) => x.key === type)?.kinds ?? null;
+  const ofType = feed.items.filter(
+    (i) => !kinds || kinds.includes(i.data.kind)
+  );
+  const shown = unreadOnly ? ofType.filter((i) => !i.read_at) : ofType;
+  // Batch action = whatever the filters show, so no selection UI is needed.
+  const unreadShown = shown.filter((i) => !i.read_at);
+  const filtered = type !== "all";
   const groups = shown.reduce<Record<string, FeedItem[]>>((acc, i) => {
     (acc[dayGroup(at(i))] ??= []).push(i);
     return acc;
@@ -910,40 +916,61 @@ export function VariantDOverviewPage() {
   return (
     <div className="mx-auto max-w-3xl p-6 lg:p-8">
       <header className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Notifications</h1>
-          <p className="mt-1 text-muted-foreground">
-            {feed.meta.unread_count} unread
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <SettingsLink />
-          <button
-            onClick={feed.markAllRead}
-            disabled={feed.meta.unread_count === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-40"
-          >
-            <CheckCheck className="size-4" /> Mark all as read
-          </button>
-        </div>
+        <h1 className="text-3xl font-bold">Notifications</h1>
+        <SettingsLink />
       </header>
-      <div className="mb-4 flex flex-wrap gap-2">
-        {C_FILTERS.map((x) => (
-          <button
-            key={x.key}
-            onClick={() => setFilter(x.key)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-sm",
-              filter === x.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-            )}
-          >
-            {x.label}
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-md border p-0.5 text-sm">
+            {[false, true].map((u) => (
+              <button
+                key={String(u)}
+                onClick={() => setUnreadOnly(u)}
+                className={cn(
+                  "rounded px-3 py-1",
+                  unreadOnly === u
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
+                )}
+              >
+                {u ? `Unread (${feed.meta.unread_count})` : "All"}
+              </button>
+            ))}
+          </div>
+          {types.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {[{ key: "all", label: "All types" }, ...types].map((x) => (
+                <button
+                  key={x.key}
+                  onClick={() => setType(x.key)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-sm",
+                    type === x.key
+                      ? "border-foreground bg-foreground/5 font-medium"
+                      : "text-muted-foreground hover:bg-accent"
+                  )}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() =>
+            feed.mark(
+              "read",
+              unreadShown.map((i) => i.id)
+            )
+          }
+          disabled={unreadShown.length === 0}
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-40"
+        >
+          <CheckCheck className="size-4" />
+          {filtered ? `Mark ${unreadShown.length} as read` : "Mark all as read"}
+        </button>
       </div>
-      {shown.length === 0 && <EmptyState unreadOnly={filter === "unread"} />}
+      {shown.length === 0 && <EmptyState unreadOnly={unreadOnly} />}
       {["Today", "Yesterday", "Earlier"].map(
         (g) =>
           groups[g] && (
