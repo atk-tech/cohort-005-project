@@ -44,6 +44,7 @@ interface SidebarProps {
   // PROTOTYPE (#33): where the Notification Feed variants mount.
   headerSlot?: React.ReactNode;
   navSlot?: React.ReactNode;
+  navEndSlot?: React.ReactNode;
 }
 
 interface NavItem {
@@ -122,6 +123,7 @@ export function Sidebar({
   isTeamAdmin = false,
   headerSlot,
   navSlot,
+  navEndSlot,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -185,6 +187,7 @@ export function Sidebar({
             Team
           </NavLink>
         )}
+        {navEndSlot}
       </nav>
 
       {recentCourses.length > 0 && (

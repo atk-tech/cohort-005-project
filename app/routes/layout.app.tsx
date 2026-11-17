@@ -264,13 +264,14 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
               />
             ) : null
           }
+          navEndSlot={
+            currentUser && variant === "E" ? <VariantENavItem /> : null
+          }
           navSlot={
             !currentUser ? null : variant === "B" ? (
               <VariantBDrawerNavItem />
             ) : variant === "C" ? (
               <VariantCNavItem />
-            ) : variant === "E" ? (
-              <VariantENavItem />
             ) : null
           }
         />
