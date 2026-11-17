@@ -7,6 +7,7 @@ import {
   VariantABell,
   VariantBDrawerNavItem,
   VariantCNavItem,
+  VariantENavItem,
 } from "~/components/notification-feed-prototype";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
@@ -256,8 +257,11 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
           recentCourses={recentCourses}
           isTeamAdmin={userIsTeamAdmin}
           headerSlot={
-            currentUser && (variant === "A" || variant === "D") ? (
-              <VariantABell viewAll={variant === "D"} />
+            currentUser && ["A", "D", "E"].includes(variant) ? (
+              <VariantABell
+                viewAll={variant === "D" || variant === "E"}
+                activeOnPage={variant === "D"}
+              />
             ) : null
           }
           navSlot={
@@ -265,6 +269,8 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
               <VariantBDrawerNavItem />
             ) : variant === "C" ? (
               <VariantCNavItem />
+            ) : variant === "E" ? (
+              <VariantENavItem />
             ) : null
           }
         />

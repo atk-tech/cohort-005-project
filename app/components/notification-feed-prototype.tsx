@@ -10,7 +10,10 @@
 //      + detail with an explicit call to action. Badge = a dot while unseen.
 //   D  Bell + overview page: A's bell and popover for a quick look, plus a
 //      "View all" link to /notifications, a plain list (no detail pane) with
-//      filters and day groups; every row goes straight to its target.
+//      filters and day groups; every row goes straight to its target. The
+//      bell is shown active on /notifications, since no nav item is.
+//   E  D plus a "Notifications" item in the main navigation (no count; the
+//      count stays on the bell), which is what's active on /notifications.
 //
 // The feed is read straight from Knock's headless API in the browser with the
 // public key + a server-signed user token (same as the Knock spike, #35).
@@ -23,7 +26,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link, NavLink, useFetcher, useNavigate } from "react-router";
+import {
+  Link,
+  NavLink,
+  useFetcher,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { Popover, Dialog } from "radix-ui";
 import {
   Bell,
@@ -55,6 +64,7 @@ export const FEED_VARIANTS = [
   { key: "B", name: "Slide-over drawer" },
   { key: "C", name: "Inbox page" },
   { key: "D", name: "Bell + overview page" },
+  { key: "E", name: "D + nav item" },
 ];
 
 export type FeedConfig = {
@@ -438,8 +448,17 @@ function EmptyState({ unreadOnly }: { unreadOnly?: boolean }) {
 
 // ------------------------------------------------------ Variant A: popover
 
-export function VariantABell({ viewAll = false }: { viewAll?: boolean }) {
+export function VariantABell({
+  viewAll = false,
+  activeOnPage = false,
+}: {
+  viewAll?: boolean;
+  // Show the bell as the active nav element on /notifications (Variant D).
+  activeOnPage?: boolean;
+}) {
   const feed = useFeed();
+  const { pathname } = useLocation();
+  const active = activeOnPage && pathname === "/notifications";
   const openItem = useOpenItem();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"unread" | "all">("all");
@@ -455,7 +474,12 @@ export function VariantABell({ viewAll = false }: { viewAll?: boolean }) {
       }}
     >
       <Popover.Trigger
-        className="relative rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        className={cn(
+          "relative rounded-md p-1.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          active
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/70"
+        )}
         title="Notifications"
       >
         {feed.meta.unseen_count > 0 ? (
@@ -699,6 +723,25 @@ export function VariantCNavItem() {
           <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500 ring-2 ring-sidebar" />
         )}
       </span>
+      Notifications
+    </NavLink>
+  );
+}
+
+export function VariantENavItem() {
+  return (
+    <NavLink
+      to="/notifications"
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )
+      }
+    >
+      <Inbox className="size-4" />
       Notifications
     </NavLink>
   );

@@ -8,5 +8,9 @@ import {
 
 export default function NotificationsPrototype() {
   const { variant } = useFeed();
-  return variant === "D" ? <VariantDOverviewPage /> : <VariantCInboxPage />;
+  return variant === "D" || variant === "E" ? (
+    <VariantDOverviewPage />
+  ) : (
+    <VariantCInboxPage />
+  );
 }
