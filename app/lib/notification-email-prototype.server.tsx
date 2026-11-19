@@ -2,9 +2,9 @@
 // (atk-tech/cohort-005-project#38). Lives on prototype/notification-email only.
 //
 // Cadence renders each email variant to HTML here and hands Knock the finished
-// subject + HTML as workflow data. The Knock workflow `prototype-notification-email`
-// has one Email step whose subject is `{{ subject }}` and whose body is
-// `{{ html }}` with no layout, so the prototype can flip variants without
+// subject + HTML as workflow data. It reuses the throwaway `test-email` workflow
+// from #37: its one Email step (Knock test channel) has the subject `{{ subject }}`
+// and the body `{{ html }}` with no layout, so the prototype can flip variants without
 // editing templates in the Knock dashboard. Real templates would be Liquid in Knock.
 import Knock from "@knocklabs/node";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -23,7 +23,7 @@ if (!process.env.KNOCK_SECRET_API_KEY) {
   process.loadEnvFile(".env");
 }
 
-export const PROTOTYPE_WORKFLOW = "prototype-notification-email";
+export const PROTOTYPE_WORKFLOW = "test-email";
 
 // Two Notifications from the catalogue (#29), filled from real rows where they exist.
 export function loadSamples(origin: string): EmailSample[] {
